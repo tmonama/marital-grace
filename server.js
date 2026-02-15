@@ -29,6 +29,15 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 20000,
 });
 
+// VERIFY CONNECTION ON START
+transporter.verify(function (error, success) {
+  if (error) {
+    console.log("❌ SMTP Connection Error: ", error);
+  } else {
+    console.log("✅ SMTP Server is ready to take our messages");
+  }
+});
+
 
 const EVENT_DETAILS = {
     name: "Marital Grace Seminar 2026",
