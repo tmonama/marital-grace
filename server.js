@@ -5,19 +5,36 @@ const PDFDocument = require('pdfkit');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
 const path = require('path');
+const { GoogleSpreadsheet } = require('google-spreadsheet');
+const { JWT } = require('google-auth-library');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// --- TICKET DATABASE (In-Memory) ---
-// Note: On Render Free, this list resets if the server sleeps/restarts.
-let ticketSales = [];
+// --- GOOGLE SHEETS SETUP ---
+const serviceAccountAuth = new JWT({
+  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Fixes newline issues in env vars
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID, serviceAccountAuth);
+
+async function addToSheet(data) {
+    try {
+        await doc.loadInfo(); 
+        const sheet = doc.sheetsByIndex[0]; // Uses the first tab
+        await sheet.addRow(data);
+        console.log("✅ Added to Google Sheets");
+    } catch (e) {
+        console.error("❌ Google Sheets Error:", e);
+    }
+}
 
 const EVENT_DETAILS = {
     name: "MARITAL GRACE",
-    tagline: "THE KEY TO 32 YEARS OF MARRIAGE",
     date: "14.03.2026",
     time: "9:00am",
     location: "63 Langrand Road, Vereeniging, 1929",
@@ -29,36 +46,6 @@ const EVENT_DETAILS = {
 
 app.get('/marital-grace', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// SECRET ADMIN ROUTE: View who bought tickets
-app.get('/admin-dashboard', (req, res) => {
-    let rows = ticketSales.map(t => `
-        <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding:10px;">${t.date}</td>
-            <td style="padding:10px;">${t.email}</td>
-            <td style="padding:10px;"><strong>${t.ref}</strong></td>
-            <td style="padding:10px;">${t.qty}</td>
-        </tr>
-    `).join('');
-
-    res.send(`
-        <div style="font-family:sans-serif; padding:40px; max-width:800px; margin:auto;">
-            <h2>Marital Grace 2026 - Guest List</h2>
-            <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 2px 10px rgba(0,0,0,0.1);">
-                <thead style="background:#A83236; color:white;">
-                    <tr>
-                        <th style="padding:10px; text-align:left;">Date</th>
-                        <th style="padding:10px; text-align:left;">Email</th>
-                        <th style="padding:10px; text-align:left;">Reference</th>
-                        <th style="padding:10px; text-align:left;">Qty</th>
-                    </tr>
-                </thead>
-                <tbody>${rows || '<tr><td colspan="4" style="padding:20px; text-align:center;">No tickets sold yet.</td></tr>'}</tbody>
-            </table>
-            <p style="margin-top:20px; font-size:0.8rem; color:gray;">Total Tickets Sold: ${ticketSales.reduce((a, b) => a + Number(b.qty), 0)}</p>
-        </div>
-    `);
 });
 
 app.post('/create-checkout', async (req, res) => {
@@ -73,8 +60,7 @@ app.post('/create-checkout', async (req, res) => {
         const response = await axios.post('https://payments.yoco.com/api/checkouts', {
             amount: amountInCents,
             currency: 'ZAR',
-            redirectUrl: redirectUrl,
-            metadata: { email, quantity }
+            redirectUrl: redirectUrl
         }, {
             headers: { 'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}` }
         });
@@ -88,23 +74,26 @@ app.post('/send-ticket', async (req, res) => {
     const { email, quantity } = req.body;
     const uniqueRef = "MG-" + uuidv4().split('-')[0].toUpperCase();
 
-    // Add to our table/list
-    ticketSales.push({
-        date: new Date().toLocaleDateString(),
-        email: email,
-        ref: uniqueRef,
-        qty: quantity
-    });
-
     try {
+        // 1. ADD TO GOOGLE SHEET
+        await addToSheet({
+            Date: new Date().toLocaleString('en-ZA'),
+            Email: email,
+            Reference: uniqueRef,
+            Quantity: quantity,
+            Status: 'Paid'
+        });
+
+        // 2. GENERATE PDF
         const pdfBuffer = await generateTicketPDF(uniqueRef, email, quantity);
         const base64Pdf = pdfBuffer.toString('base64');
 
+        // 3. SEND EMAIL (Brevo API)
         await axios.post('https://api.brevo.com/v3/smtp/email', {
             sender: { name: "Marital Grace Team", email: process.env.FROM_EMAIL },
             to: [{ email: email }],
             subject: `Your Tickets: Marital Grace Seminar (Ref: ${uniqueRef})`,
-            htmlContent: `<h2>Success!</h2><p>Your tickets for Marital Grace are attached.</p>`,
+            htmlContent: `<h2>Success!</h2><p>Find your tickets attached for reference <b>${uniqueRef}</b>.</p>`,
             attachment: [{ content: base64Pdf, name: `Ticket-${uniqueRef}.pdf` }]
         }, {
             headers: { 'api-key': process.env.BREVO_API_KEY }
@@ -112,74 +101,60 @@ app.post('/send-ticket', async (req, res) => {
 
         res.json({ success: true, ref: uniqueRef });
     } catch (error) {
-        res.status(500).json({ error: "Email failed" });
+        console.error(error);
+        res.status(500).json({ error: "Process failed" });
     }
 });
 
-// --- NEW PDF DESIGN (MATCHING YOUR IMAGE) ---
+// --- PDF GENERATOR (STUB DESIGN) ---
 function generateTicketPDF(ref, email, qty) {
     return new Promise((resolve) => {
-        // Ticket size: 800x250 (Long rectangular stub)
         const doc = new PDFDocument({ size: [800, 250], margin: 0 });
         let buffers = [];
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-        // 1. Background Color (Cream)
-        doc.rect(0, 0, 800, 250).fill('#F2EFE9');
-
-        // 2. Polaroid Image Placeholder (Left side)
-        // If you have the image in your public/media folder:
+        doc.rect(0, 0, 800, 250).fill('#F2EFE9'); // Cream
+        
         try {
-            doc.image('public/media/1994.png', 20, 25, { width: 180 });
+            doc.image('public/media/1994.png', 25, 25, { width: 170 });
         } catch (e) {
-            doc.rect(20, 25, 180, 200).stroke('#ccc'); // Fallback box
+            doc.rect(25, 25, 170, 200).stroke('#ccc');
         }
 
-        // 3. Main Text Section
-        doc.fillColor('#000').font('Helvetica').fontSize(12).text('EVENT TICKET', 230, 40);
-        
-        // Title (Red Brush Style approximation)
-        doc.fillColor('#A83236').font('Times-BoldItalic').fontSize(45).text('MARITAL', 230, 65);
-        doc.text('GRACE', 230, 110);
-        
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(10).text('THE KEY TO 32 YEARS OF MARRIAGE', 230, 165);
+        doc.fillColor('#000').font('Helvetica').fontSize(11).text('EVENT TICKET', 230, 40);
+        doc.fillColor('#A83236').font('Times-BoldItalic').fontSize(48).text('MARITAL', 230, 60);
+        doc.text('GRACE', 230, 105);
+        doc.fillColor('#000').font('Helvetica-Bold').fontSize(10).text('THE KEY TO 32 YEARS OF MARRIAGE', 230, 160);
 
-        // 4. Details Table
-        doc.lineWidth(1);
-        doc.moveTo(220, 185).lineTo(580, 185).stroke('#000'); // Top line
-        doc.moveTo(220, 215).lineTo(580, 215).stroke('#000'); // Middle line
-        doc.moveTo(220, 245).lineTo(580, 245).stroke('#000'); // Bottom line
-        doc.moveTo(500, 185).lineTo(500, 245).stroke('#000'); // Vertical divider
+        // Table
+        doc.rect(220, 180, 360, 50).stroke('#000');
+        doc.moveTo(220, 205).lineTo(580, 205).stroke('#000');
+        doc.moveTo(480, 180).lineTo(480, 230).stroke('#000');
 
-        doc.fontSize(11).font('Helvetica');
-        doc.text(EVENT_DETAILS.venue, 230, 195);
-        doc.text(EVENT_DETAILS.date, 510, 195);
-        doc.text(EVENT_DETAILS.location, 230, 225);
-        doc.text(EVENT_DETAILS.time, 510, 225);
+        doc.fontSize(10).font('Helvetica');
+        doc.text(EVENT_DETAILS.venue, 230, 188);
+        doc.text(EVENT_DETAILS.date, 490, 188);
+        doc.text(EVENT_DETAILS.location, 230, 213);
+        doc.text(EVENT_DETAILS.time, 490, 213);
 
-        // 5. Vertical Dotted Line (Perforation)
-        doc.circle(600, 0, 20).fill('#F9F7F2'); // Cutout effect
-        doc.circle(600, 250, 20).fill('#F9F7F2'); 
-        
-        for(let i = 20; i < 230; i+=15) {
-            doc.circle(600, i, 3).fill('#000');
-        }
+        // Perforation
+        for(let i = 10; i < 250; i+=15) { doc.circle(610, i, 3).fill('#000'); }
 
-        // 6. Right Stub (Barcode Area)
+        // Stub
         doc.save();
         doc.rotate(-90, { origin: [750, 125] });
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(14).text(`TICKET NUMBER:  ${ref}`, 640, 120);
+        doc.fillColor('#000').font('Helvetica-Bold').fontSize(12).text(`REF: ${ref} | ADMIT: ${qty}`, 640, 125);
         doc.restore();
 
-        // Barcode lines (Simulated)
-        for(let i = 0; i < 50; i++) {
-            let w = Math.random() * 3;
-            doc.rect(660 + (i*2.5), 40, w, 140).fill('#000');
+        // Barcode
+        for(let i = 0; i < 40; i++) {
+            doc.rect(670 + (i*3), 40, Math.random()*2.5, 140).fill('#000');
         }
 
         doc.end();
     });
 }
 
-app.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT);
