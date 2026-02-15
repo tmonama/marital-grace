@@ -216,10 +216,10 @@
         const ticketPrice = 100;
         let quantity = 1;
 
+        // 1. Handle Quantity
         function updateQty(change) {
             const input = document.getElementById('ticket-qty');
             let newQty = parseInt(input.value) + change;
-            
             if (newQty >= 1 && newQty <= 20) {
                 quantity = newQty;
                 input.value = quantity;
@@ -227,6 +227,7 @@
             }
         }
 
+        // 2. Handle Payment Click
         async function payWithYoco() {
             const email = document.getElementById('email').value;
             const btn = document.querySelector('button[onclick="payWithYoco()"]');
@@ -236,40 +237,80 @@
                 return;
             }
 
-            // 1. Show Loading State
-            const originalText = btn.innerHTML;
             btn.innerHTML = "Redirecting to Payment...";
             btn.disabled = true;
 
             try {
-                // 2. Ask Backend for a Payment Link
-                const response = await fetch('http://localhost:3000/create-checkout', {
+                // Note: We use a relative path /create-checkout
+                const response = await fetch('/create-checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: email,
-                        quantity: quantity
-                    })
+                    body: JSON.stringify({ email, quantity })
                 });
 
                 const data = await response.json();
-
                 if (data.redirectUrl) {
-                    // 3. Redirect User to Yoco's Secure Page
                     window.location.href = data.redirectUrl;
                 } else {
                     alert("Error: " + (data.error || "Could not create payment link"));
-                    btn.innerHTML = originalText;
                     btn.disabled = false;
+                    btn.innerHTML = "Pay Securely";
                 }
-
             } catch (err) {
                 console.error(err);
-                alert("Network error. Please try again.");
-                btn.innerHTML = originalText;
+                alert("Network error.");
                 btn.disabled = false;
+                btn.innerHTML = "Pay Securely";
             }
         }
+
+        // 3. CHECK FOR SUCCESS ON PAGE LOAD
+        // This runs when Yoco redirects the user back to us
+        window.onload = async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // If the URL has ?payment_success=true
+            if (urlParams.get('payment_success') === 'true') {
+                const email = urlParams.get('email');
+                const qty = urlParams.get('qty');
+
+                // Show a success message immediately
+                document.body.innerHTML = `
+                    <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#F9F7F2; text-align:center;">
+                        <div style="background:white; padding:40px; border-radius:10px; shadow:lg;">
+                            <h1 style="color:green; font-size:2rem; margin-bottom:10px;">Payment Successful!</h1>
+                            <p style="color:#555;">Generating your ticket and sending email...</p>
+                            <div style="margin-top:20px; font-weight:bold; color:#A83236;">Please wait...</div>
+                        </div>
+                    </div>
+                `;
+
+                try {
+                    // Ask server to send the email
+                    const response = await fetch('/send-ticket', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email, quantity: qty })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        document.body.innerHTML = `
+                            <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#F9F7F2; text-align:center;">
+                                <div style="background:white; padding:40px; border-radius:10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <h1 style="color:#A83236; font-family:serif; font-size:2.5rem;">Thank You!</h1>
+                                    <p style="margin:20px 0; font-size:1.1rem;">Your payment was successful.</p>
+                                    <p>Your ticket (Ref: <strong>${data.ref}</strong>) has been sent to <strong>${email}</strong>.</p>
+                                    <a href="/marital-grace" style="display:inline-block; margin-top:20px; background:#1a1a1a; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;">Return to Home</a>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } catch (err) {
+                    document.body.innerHTML = "<h1>Payment received, but email failed. Please contact support.</h1>";
+                }
+            }
+        };
     </script>
 </body>
 </html>
