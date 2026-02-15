@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marital Grace | Couples Seminar 2026</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <!-- Custom Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-red': '#A83236',
+                        'brand-cream': '#F9F7F2',
+                        'brand-dark': '#1a1a1a',
+                    },
+                    fontFamily: {
+                        serif: ['Playfair Display', 'serif'],
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .polaroid {
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transform: rotate(-2deg);
+            transition: transform 0.3s;
+        }
+        .polaroid:hover {
+            transform: rotate(0deg) scale(1.02);
+            z-index: 10;
+        }
+        .hero-pattern {
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23A83236' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+    </style>
+</head>
+<body class="bg-brand-cream text-brand-dark font-sans antialiased">
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <div class="flex-shrink-0 flex items-center">
+                    <span class="font-serif text-2xl font-bold text-brand-red tracking-wider leading-none">MARITAL GRACE</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#about" class="text-sm font-medium text-gray-600 hover:text-brand-red transition">About</a>
+                    <a href="#details" class="text-sm font-medium text-gray-600 hover:text-brand-red transition">Details</a>
+                    <a href="#tickets" class="bg-brand-red text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-red-800 transition shadow-sm">Get Tickets</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden hero-pattern">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+            <p class="text-sm font-semibold tracking-[0.2em] text-gray-500 uppercase mb-4">Couples Seminar 2026</p>
+            <h1 class="text-5xl md:text-7xl font-serif font-bold text-brand-dark mb-6 leading-tight">
+                The Key to <span class="text-brand-red italic">32 Years</span> <br/> of Marriage
+            </h1>
+            <p class="mt-4 text-xl text-gray-600 max-w-2xl mx-auto">
+                What keeps love strong through every season? The answer is grace.
+            </p>
+            <div class="mt-10 flex justify-center gap-4">
+                <a href="#tickets" class="bg-brand-red text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-red-800 transition shadow-lg hover:shadow-xl">
+                    Book Your Seat — R100
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- About Section -->
+    <section id="about" class="py-20 bg-white">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                <div class="relative h-96 w-full flex justify-center items-center">
+                    <div class="polaroid absolute top-0 left-10 w-64 rotate-[-6deg] z-10">
+                        <img src="./media/1994.png" onerror="this.src='https://images.unsplash.com/photo-1628891435227-0c7cd3db5e97?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'" alt="Vintage Wedding" class="w-full grayscale">
+                        <div class="text-center font-serif text-sm mt-2 text-gray-500">1994</div>
+                    </div>
+                    <div class="polaroid absolute bottom-0 right-10 w-64 rotate-[4deg] z-20">
+                        <img src="./media/2026.png" onerror="this.src='https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'" alt="Couple Happy" class="w-full grayscale">
+                        <div class="text-center font-serif text-sm mt-2 text-gray-500">2026</div>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-serif font-bold mb-6">Building on the Rock</h2>
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        What makes a marriage last 32 years? Join us as we unpack the power of building your covenant on Christ. Because when God is included, marriage is not just sustained… it is strengthened.
+                    </p>
+                    <blockquote class="border-l-4 border-brand-red pl-6 py-2 italic bg-gray-50 rounded-r-lg">
+                        <p class="text-lg text-gray-800 font-serif">
+                            “Though one may be overpowered by another, two can withstand him. And a threefold cord is not quickly broken.”
+                        </p>
+                        <footer class="text-sm font-bold text-brand-red mt-2">— Ecclesiastes 4:12 (NKJV)</footer>
+                    </blockquote>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Details Section -->
+    <section id="details" class="py-20 bg-brand-dark text-white relative">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <h2 class="text-3xl font-serif font-bold mb-12">Event Details</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                <div class="p-6 border border-gray-700 rounded-lg">
+                    <div class="text-brand-red text-2xl mb-4">📅</div>
+                    <h3 class="text-xl font-bold mb-2">Date</h3>
+                    <p class="text-gray-400">Saturday, 14 March 2026</p>
+                </div>
+                <div class="p-6 border border-gray-700 rounded-lg">
+                    <div class="text-brand-red text-2xl mb-4">⏰</div>
+                    <h3 class="text-xl font-bold mb-2">Time</h3>
+                    <p class="text-gray-400">9:00 AM Sharp</p>
+                </div>
+                <div class="p-6 border border-gray-700 rounded-lg">
+                    <div class="text-brand-red text-2xl mb-4">📍</div>
+                    <h3 class="text-xl font-bold mb-2">Location</h3>
+                    <p class="text-gray-400">The Synagogues, Langrand Road<br>Vereeniging, 1929</p>
+                    <a href="https://maps.google.com/?q=The+Synagogues+Langrand+Road+Vereeniging" target="_blank" class="text-brand-red text-sm underline mt-2 block">View on Map</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Ticket & Payment Section -->
+    <section id="tickets" class="py-20 bg-brand-cream">
+        <div class="max-w-lg mx-auto px-4">
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                <div class="bg-brand-red p-6 text-center text-white">
+                    <h2 class="text-2xl font-serif font-bold">Secure Your Seat</h2>
+                    <p class="text-white/80">Invest in your marriage today</p>
+                </div>
+                
+                <div class="p-8">
+                    <!-- Ticket Selector -->
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-6">
+                        <div>
+                            <h3 class="font-bold text-lg">General Admission</h3>
+                            <p class="text-sm text-gray-500">Full seminar access + refreshments</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="block text-2xl font-bold text-brand-dark">R100</span>
+                            <span class="text-xs text-gray-400">per person</span>
+                        </div>
+                    </div>
+
+                    <form id="payment-form" onsubmit="event.preventDefault();">
+                        <!-- Quantity Selector -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Number of Tickets</label>
+                            <div class="flex items-center border border-gray-300 rounded-lg w-32">
+                                <button type="button" onclick="updateQty(-1)" class="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-l-lg">-</button>
+                                <input type="number" id="ticket-qty" value="1" min="1" max="10" class="w-full text-center border-none focus:ring-0" readonly>
+                                <button type="button" onclick="updateQty(1)" class="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Email Input -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                            <input type="email" id="email" placeholder="john@example.com" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-brand-red focus:ring-brand-red p-2 border" required>
+                        </div>
+
+                        <!-- Total Price Display -->
+                        <div class="flex justify-between items-center mb-6">
+                            <span class="font-bold text-gray-700">Total Amount</span>
+                            <span class="font-bold text-2xl text-brand-red" id="total-price">R100.00</span>
+                        </div>
+
+                        <!-- Note about redirection -->
+                         <div class="mb-6 bg-blue-50 text-blue-700 px-4 py-3 rounded text-sm text-center">
+                            You will be redirected to Yoco to complete your secure payment.
+                        </div>
+
+                        <!-- Pay Button -->
+                        <button type="button" onclick="payWithYoco()" class="w-full bg-brand-dark text-white py-4 rounded-lg font-bold text-lg hover:bg-gray-800 transition flex justify-center items-center gap-2">
+                            Proceed to Payment
+                        </button>
+                        
+                        <p class="text-center text-xs text-gray-400 mt-4">
+                            Payments processed securely by Yoco. <br>Cards accepted: Visa & Mastercard.
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-10 text-center">
+        <div class="max-w-6xl mx-auto px-4">
+            <p class="font-serif font-bold text-brand-red text-xl mb-4">MARITAL GRACE</p>
+            <p class="text-gray-500 mb-2">The Synagogues, Langrand Road, Vereeniging</p>
+            <p class="text-gray-400 text-sm">&copy; 2026 The Synagogues. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        const ticketPrice = 100;
+        let quantity = 1;
+
+        function updateQty(change) {
+            const input = document.getElementById('ticket-qty');
+            let newQty = parseInt(input.value) + change;
+            
+            if (newQty >= 1 && newQty <= 20) {
+                quantity = newQty;
+                input.value = quantity;
+                document.getElementById('total-price').innerText = 'R' + (quantity * ticketPrice) + '.00';
+            }
+        }
+
+        async function payWithYoco() {
+            const email = document.getElementById('email').value;
+            const btn = document.querySelector('button[onclick="payWithYoco()"]');
+            
+            if(!email || !email.includes('@')) {
+                alert("Please enter a valid email address.");
+                return;
+            }
+
+            // 1. Show Loading State
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "Redirecting to Payment...";
+            btn.disabled = true;
+
+            try {
+                // 2. Ask Backend for a Payment Link
+                const response = await fetch('http://localhost:3000/create-checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: email,
+                        quantity: quantity
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.redirectUrl) {
+                    // 3. Redirect User to Yoco's Secure Page
+                    window.location.href = data.redirectUrl;
+                } else {
+                    alert("Error: " + (data.error || "Could not create payment link"));
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Network error. Please try again.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
