@@ -1,44 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
 const { v4: uuidv4 } = require('uuid');
-const axios = require('axios');
-const path = require('path'); // Required for file paths
+const axios = require('axios'); // We use this for the API call
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// 1. Serve Static Files (HTML, CSS, Images)
 app.use(express.static('public'));
 
 // --- CONFIGURATION ---
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: false, // false for 587 (STARTTLS)
-  auth: {
-    user: process.env.BREVO_SMTP_USER, // Brevo SMTP login (not your Gmail)
-    pass: process.env.BREVO_SMTP_PASS  // Brevo SMTP key/password
-  },
-  requireTLS: true,
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
-});
-
-// VERIFY CONNECTION ON START
-transporter.verify(function (error, success) {
-  if (error) {
-    console.log("❌ SMTP Connection Error: ", error);
-  } else {
-    console.log("✅ SMTP Server is ready to take our messages");
-  }
-});
-
-
 const EVENT_DETAILS = {
     name: "Marital Grace Seminar 2026",
     date: "14 March 2026",
@@ -47,55 +20,7 @@ const EVENT_DETAILS = {
     pricePerTicket: 100
 };
 
-// --- ROUTES ---
-
-// 2. Serve the Website at the specific path "/marital-grace"
-app.get('/marital-grace', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// 3. Payment Checkout Route
-app.post('/create-checkout', async (req, res) => {
-    const { email, quantity } = req.body;
-    const amountInCents = (quantity * 100) * 100;
-
-    // DETECT DOMAIN:
-    // If running locally, use localhost. If on Render, use the real domain.
-    const host = req.get('host'); 
-    const protocol = req.protocol;
-    const domain = `${protocol}://${host}`; 
-    
-    // Yoco needs to know where to send them back.
-    // We send them back to the /marital-grace page with a success flag
-    const redirectUrl = `${domain}/marital-grace?payment_success=true&email=${encodeURIComponent(email)}&qty=${quantity}`;
-    const failUrl = `${domain}/marital-grace`;
-
-    try {
-        const response = await axios.post(
-            'https://payments.yoco.com/api/checkouts',
-            {
-                amount: amountInCents,
-                currency: 'ZAR',
-                redirectUrl: redirectUrl,
-                successUrl: redirectUrl, // Some Yoco versions use this
-                cancelUrl: failUrl,
-                metadata: { email, product: 'Marital Grace Seminar' }
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        res.json({ redirectUrl: response.data.redirectUrl });
-    } catch (error) {
-        console.error("Yoco Error:", error.response?.data || error.message);
-        res.status(500).json({ error: "Failed to create payment link" });
-    }
-});
-
-// 4. Trigger Email (Called by frontend after successful redirect)
+// --- ROUTE: SEND TICKET (Using Brevo API) ---
 app.post('/send-ticket', async (req, res) => {
     const { email, quantity } = req.body;
     
@@ -104,23 +29,47 @@ app.post('/send-ticket', async (req, res) => {
     const uniqueRef = "MG-" + uuidv4().split('-')[0].toUpperCase();
 
     try {
+        // 1. Generate PDF Buffer
         const pdfBuffer = await generateTicketPDF(uniqueRef, email, quantity);
         
-        const mailOptions = {
-            from: `"Marital Grace Team" <${process.env.FROM_EMAIL}>`,
-            to: email,
+        // 2. Convert PDF to Base64 (Brevo API requires this)
+        const base64Pdf = pdfBuffer.toString('base64');
+
+        // 3. Construct Brevo API Payload
+        const emailData = {
+            sender: { name: "Marital Grace Team", email: process.env.FROM_EMAIL },
+            to: [{ email: email }],
             subject: `Your Tickets: Marital Grace Seminar (Ref: ${uniqueRef})`,
-            html: `<h2>Payment Successful!</h2><p>Thank you for booking. Please find your official tickets attached.</p>`,
-            attachments: [{ filename: `Ticket-${uniqueRef}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
+            htmlContent: `
+                <h2>Payment Successful!</h2>
+                <p>Thank you for booking. Your reference is <strong>${uniqueRef}</strong>.</p>
+                <p>Please find your official tickets attached to this email.</p>
+                <br>
+                <p>See you on the 14th of March!</p>
+            `,
+            attachment: [
+                {
+                    content: base64Pdf,
+                    name: `Ticket-${uniqueRef}.pdf`
+                }
+            ]
         };
 
-        await transporter.sendMail(mailOptions);
-        console.log(`Ticket sent to ${email}`);
+        // 4. Send via Axios to Brevo API
+        await axios.post('https://api.brevo.com/v3/smtp/email', emailData, {
+            headers: {
+                'api-key': process.env.BREVO_API_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log(`✅ Ticket sent via API to ${email}`);
         res.json({ success: true, ref: uniqueRef });
 
     } catch (error) {
-        console.error("Email Error:", error);
-        res.status(500).json({ error: "Failed to send email" });
+        // Detailed error logging
+        console.error("❌ Brevo API Error:", error.response ? error.response.data : error.message);
+        res.status(500).json({ error: "Failed to send email via API" });
     }
 });
 
