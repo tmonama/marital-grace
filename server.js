@@ -16,12 +16,19 @@ app.use(express.static('public'));
 
 // --- CONFIGURATION ---
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
+  host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: false, // false for 587 (STARTTLS)
+  auth: {
+    user: process.env.BREVO_SMTP_USER, // Brevo SMTP login (not your Gmail)
+    pass: process.env.BREVO_SMTP_PASS  // Brevo SMTP key/password
+  },
+  requireTLS: true,
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
 });
+
 
 const EVENT_DETAILS = {
     name: "Marital Grace Seminar 2026",
@@ -91,7 +98,7 @@ app.post('/send-ticket', async (req, res) => {
         const pdfBuffer = await generateTicketPDF(uniqueRef, email, quantity);
         
         const mailOptions = {
-            from: `"Marital Grace Team" <${process.env.EMAIL_USER}>`,
+            from: `"Marital Grace Team" <${process.env.FROM_EMAIL}>`,
             to: email,
             subject: `Your Tickets: Marital Grace Seminar (Ref: ${uniqueRef})`,
             html: `<h2>Payment Successful!</h2><p>Thank you for booking. Please find your official tickets attached.</p>`,
