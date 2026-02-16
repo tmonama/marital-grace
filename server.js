@@ -11,8 +11,6 @@ const { JWT } = require('google-auth-library');
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// Serve static files (images, css) from the public folder
 app.use(express.static('public'));
 
 // --- 1. GOOGLE SHEETS CONFIGURATION ---
@@ -28,8 +26,9 @@ async function saveAttendeeToSheet(data) {
     try {
         await doc.loadInfo();
         const sheet = doc.sheetsByIndex[0]; 
+        // We use exact keys matching your Spreadsheet Headers
         await sheet.addRow(data);
-        console.log("✅ Guest list updated in Google Sheets");
+        console.log("✅ Google Sheet Updated");
     } catch (e) {
         console.error("❌ Google Sheets Error:", e.message);
     }
@@ -41,111 +40,77 @@ const EVENT_DETAILS = {
     tagline: "THE KEY TO 32 YEARS OF MARRIAGE",
     date: "14.03.2026",
     time: "9:00am",
-    location: "63 Langrand Road, Vereeniging, 1929",
+    location: "Langrand Road, Vereeniging, 1929", // Removed '63'
     venue: "The Synagogues JWC",
     pricePerTicket: 100
 };
 
 // --- 3. ROUTES ---
 
-// Serve the main website at /marital-grace
 app.get('/marital-grace', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Step 1: Create the Yoco Checkout Link
 app.post('/create-checkout', async (req, res) => {
     const { email, quantity, firstName, lastName } = req.body;
     const amountInCents = (quantity * EVENT_DETAILS.pricePerTicket) * 100;
 
-    // Determine current domain dynamically
     const host = req.get('host');
     const protocol = req.protocol === 'http' && host.includes('localhost') ? 'http' : 'https';
     const domain = `${protocol}://${host}`;
 
-    // Where to send user after payment
     const redirectUrl = `${domain}/marital-grace?payment_success=true&email=${encodeURIComponent(email)}&qty=${quantity}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}`;
 
     try {
-        const response = await axios.post(
-            'https://payments.yoco.com/api/checkouts',
-            {
-                amount: amountInCents,
-                currency: 'ZAR',
-                redirectUrl: redirectUrl,
-                successUrl: redirectUrl,
-                cancelUrl: `${domain}/marital-grace`,
-                metadata: { email, firstName, lastName }
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
+        const response = await axios.post('https://payments.yoco.com/api/checkouts', {
+            amount: amountInCents,
+            currency: 'ZAR',
+            redirectUrl: redirectUrl,
+            metadata: { email, firstName, lastName }
+        }, {
+            headers: { 'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}` }
+        });
         res.json({ redirectUrl: response.data.redirectUrl });
     } catch (error) {
-        console.error("Yoco API Error:", error.response?.data || error.message);
-        res.status(500).json({ error: "Could not initiate payment." });
+        res.status(500).json({ error: "Checkout failed" });
     }
 });
 
-// Step 2: Generate Ticket, Save to Sheet, and Email (Triggered after successful redirect)
 app.post('/send-ticket', async (req, res) => {
     const { email, quantity, firstName, lastName } = req.body;
-    
-    if (!email) return res.status(400).json({ error: "Missing email" });
-
     const uniqueRef = "MG-" + uuidv4().split('-')[0].toUpperCase();
 
     try {
-        // A. Log to Google Sheets
+        // FIXED: Keys now match your spreadsheet headers exactly
         await saveAttendeeToSheet({
-            Timestamp: new Date().toLocaleString('en-ZA'),
+            Date: new Date().toLocaleString('en-ZA'),
             Name: `${firstName} ${lastName}`,
             Email: email,
             Reference: uniqueRef,
             Quantity: quantity,
-            Total: `R${quantity * EVENT_DETAILS.pricePerTicket}`
+            Status: "Paid"
         });
 
-        // B. Generate the PDF
         const pdfBuffer = await generateTicketPDF(uniqueRef, email, quantity, firstName, lastName);
         const base64Pdf = pdfBuffer.toString('base64');
 
-        // C. Send via Brevo API
         await axios.post('https://api.brevo.com/v3/smtp/email', {
             sender: { name: "Marital Grace Team", email: process.env.FROM_EMAIL },
             to: [{ email: email }],
             subject: `Your Tickets: Marital Grace Seminar (Ref: ${uniqueRef})`,
-            htmlContent: `
-                <div style="font-family: sans-serif;">
-                    <h2>Payment Successful!</h2>
-                    <p>Hi ${firstName}, thank you for booking your seat. Your reference number is <b>${uniqueRef}</b>.</p>
-                    <p>Please find your official entry tickets attached to this email.</p>
-                    <br>
-                    <p>We look forward to seeing you at <b>The Synagogues JWC</b> on the 14th of March.</p>
-                </div>
-            `,
+            htmlContent: `<p>Hi ${firstName},</p><p>Your tickets for Marital Grace are attached. Ref: <b>${uniqueRef}</b></p>`,
             attachment: [{ content: base64Pdf, name: `Ticket-${uniqueRef}.pdf` }]
         }, {
-            headers: { 
-                'api-key': process.env.BREVO_API_KEY,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'api-key': process.env.BREVO_API_KEY }
         });
 
-        console.log(`✅ Ticket ${uniqueRef} processed for ${email}`);
         res.json({ success: true, ref: uniqueRef });
-
     } catch (error) {
-        console.error("Processing Error:", error.response?.data || error.message);
-        res.status(500).json({ error: "Failed to complete ticket processing." });
+        res.status(500).json({ error: "Failed to process" });
     }
 });
 
-// --- UPDATED PDF GENERATOR (FIXED BARCODE OVERLAP) ---
+// --- 4. REDESIGNED PDF GENERATOR ---
 function generateTicketPDF(ref, email, qty, firstName, lastName) {
     return new Promise((resolve) => {
         const doc = new PDFDocument({ size: [800, 250], margin: 0 });
@@ -153,56 +118,59 @@ function generateTicketPDF(ref, email, qty, firstName, lastName) {
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', () => resolve(Buffer.concat(buffers)));
 
+        // Background
         doc.rect(0, 0, 800, 250).fill('#F2EFE9'); 
 
+        // Center Image in the left section (approx 0-210 range)
         try {
-            doc.image('public/media/1994.png', 25, 25, { width: 175 });
+            // Image is 170 wide. To center in 210 area: (210-170)/2 = 20
+            doc.image('public/media/1994.png', 20, 25, { width: 170 });
         } catch (e) {
-            doc.rect(25, 25, 175, 200).stroke('#ccc');
+            doc.rect(20, 25, 170, 200).stroke('#ccc');
         }
 
+        // Event Header
         doc.fillColor('#000').font('Helvetica').fontSize(11).text('EVENT TICKET', 230, 35);
         doc.fillColor('#A83236').font('Times-BoldItalic').fontSize(48).text('MARITAL', 230, 55);
         doc.text('GRACE', 230, 100);
         
-        // Added Attendee Name to PDF
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(14).text(`${firstName.toUpperCase()} ${lastName.toUpperCase()}`, 230, 150);
-        doc.fontSize(9).font('Helvetica').text('THE KEY TO 32 YEARS OF MARRIAGE', 230, 170);
+        // Tagline First
+        doc.fillColor('#000').font('Helvetica').fontSize(9).text(EVENT_DETAILS.tagline, 230, 150);
+        
+        // Name BELOW Tagline
+        doc.fillColor('#A83236').font('Helvetica-Bold').fontSize(16).text(`${firstName.toUpperCase()} ${lastName.toUpperCase()}`, 230, 168);
 
-        // Table
-        doc.rect(220, 185, 360, 45).stroke('#000');
-        doc.moveTo(220, 207).lineTo(580, 207).stroke('#000');
-        doc.moveTo(480, 185).lineTo(480, 230).stroke('#000');
+        // Details Table
+        doc.rect(220, 195, 360, 45).stroke('#000');
+        doc.moveTo(220, 217).lineTo(580, 217).stroke('#000'); // Horizontal
+        doc.moveTo(480, 195).lineTo(480, 240).stroke('#000'); // Vertical
 
-        doc.fontSize(9).font('Helvetica');
-        doc.text("The Synagogues JWC", 230, 193);
-        doc.text("14.03.2026", 490, 193);
-        doc.text("63 Langrand Road, Vereeniging", 230, 215);
-        doc.text("9:00am", 490, 215);
+        doc.fontSize(9).font('Helvetica').fillColor('#000');
+        doc.text(EVENT_DETAILS.venue, 230, 202);
+        doc.text(EVENT_DETAILS.date, 490, 202);
+        doc.text(EVENT_DETAILS.location, 230, 224);
+        doc.text(EVENT_DETAILS.time, 490, 224);
 
         // Perforation
         for(let i = 10; i < 250; i+=15) { doc.circle(610, i, 3).fill('#000'); }
 
-        // Vertical Stub Text - MOVED LEFT to avoid barcode
+        // STUB (Right side) - Removed Barcode, centered text nicely
         doc.save();
-        doc.rotate(-90, { origin: [750, 125] });
-        // Shifted x-coordinate (which is vertical height after rotation)
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(11).text(`TICKET NO: ${ref}  |  ADMIT: ${qty}`, 630, 110);
+        doc.rotate(-90, { origin: [700, 125] });
+        
+        // Reference Number
+        doc.fillColor('#000').font('Helvetica-Bold').fontSize(14)
+           .text(`TICKET NO: ${ref}`, 580, 110);
+        
+        // Quantity nicely spaced below
+        doc.fillColor('#555').font('Helvetica').fontSize(12)
+           .text(`ADMIT: ${qty} PERSON(S)`, 580, 135);
+        
         doc.restore();
-
-        // Barcode - SHIFTED RIGHT and made narrower
-        for(let i = 0; i < 40; i++) {
-            let barWidth = Math.random() * 2 + 0.5;
-            // Started at 690 instead of 660
-            doc.rect(690 + (i * 2.5), 40, barWidth, 140).fill('#000');
-        }
 
         doc.end();
     });
 }
 
-// Start Server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Marital Grace server live on port ${PORT}`);
-});
+app.listen(PORT);
