@@ -172,6 +172,17 @@
                         </div>
 
                         <!-- Email Input -->
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                                <input type="text" id="firstName" placeholder="John" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-brand-red focus:ring-brand-red p-2 border" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                                <input type="text" id="lastName" placeholder="Doe" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-brand-red focus:ring-brand-red p-2 border" required>
+                            </div>
+                        </div>
+
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
                             <input type="email" id="email" placeholder="john@example.com" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-brand-red focus:ring-brand-red p-2 border" required>
@@ -230,10 +241,12 @@
         // 2. Handle Payment Click
         async function payWithYoco() {
             const email = document.getElementById('email').value;
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
             const btn = document.querySelector('button[onclick="payWithYoco()"]');
             
-            if(!email || !email.includes('@')) {
-                alert("Please enter a valid email address.");
+            if(!email || !firstName || !lastName) {
+                alert("Please fill in all fields.");
                 return;
             }
 
@@ -241,11 +254,10 @@
             btn.disabled = true;
 
             try {
-                // Note: We use a relative path /create-checkout
                 const response = await fetch('/create-checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, quantity })
+                    body: JSON.stringify({ email, quantity, firstName, lastName })
                 });
 
                 const data = await response.json();
@@ -254,13 +266,10 @@
                 } else {
                     alert("Error: " + (data.error || "Could not create payment link"));
                     btn.disabled = false;
-                    btn.innerHTML = "Pay Securely";
                 }
             } catch (err) {
-                console.error(err);
                 alert("Network error.");
                 btn.disabled = false;
-                btn.innerHTML = "Pay Securely";
             }
         }
 
@@ -273,6 +282,8 @@
             if (urlParams.get('payment_success') === 'true') {
                 const email = urlParams.get('email');
                 const qty = urlParams.get('qty');
+                const firstName = urlParams.get('firstName');
+                const lastName = urlParams.get('lastName');
 
                 // Show a success message immediately
                 document.body.innerHTML = `
@@ -290,7 +301,7 @@
                     const response = await fetch('/send-ticket', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: email, quantity: qty })
+                        body: JSON.stringify({ email, quantity: qty, firstName, lastName })
                     });
 
                     const data = await response.json();

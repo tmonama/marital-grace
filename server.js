@@ -55,7 +55,7 @@ app.get('/marital-grace', (req, res) => {
 
 // Step 1: Create the Yoco Checkout Link
 app.post('/create-checkout', async (req, res) => {
-    const { email, quantity } = req.body;
+    const { email, quantity, firstName, lastName } = req.body;
     const amountInCents = (quantity * EVENT_DETAILS.pricePerTicket) * 100;
 
     // Determine current domain dynamically
@@ -64,7 +64,7 @@ app.post('/create-checkout', async (req, res) => {
     const domain = `${protocol}://${host}`;
 
     // Where to send user after payment
-    const redirectUrl = `${domain}/marital-grace?payment_success=true&email=${encodeURIComponent(email)}&qty=${quantity}`;
+    const redirectUrl = `${domain}/marital-grace?payment_success=true&email=${encodeURIComponent(email)}&qty=${quantity}&firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}`;
 
     try {
         const response = await axios.post(
@@ -75,7 +75,7 @@ app.post('/create-checkout', async (req, res) => {
                 redirectUrl: redirectUrl,
                 successUrl: redirectUrl,
                 cancelUrl: `${domain}/marital-grace`,
-                metadata: { email, quantity }
+                metadata: { email, firstName, lastName }
             },
             {
                 headers: {
@@ -93,7 +93,7 @@ app.post('/create-checkout', async (req, res) => {
 
 // Step 2: Generate Ticket, Save to Sheet, and Email (Triggered after successful redirect)
 app.post('/send-ticket', async (req, res) => {
-    const { email, quantity } = req.body;
+    const { email, quantity, firstName, lastName } = req.body;
     
     if (!email) return res.status(400).json({ error: "Missing email" });
 
@@ -103,6 +103,7 @@ app.post('/send-ticket', async (req, res) => {
         // A. Log to Google Sheets
         await saveAttendeeToSheet({
             Timestamp: new Date().toLocaleString('en-ZA'),
+            Name: `${firstName} ${lastName}`,
             Email: email,
             Reference: uniqueRef,
             Quantity: quantity,
@@ -110,7 +111,7 @@ app.post('/send-ticket', async (req, res) => {
         });
 
         // B. Generate the PDF
-        const pdfBuffer = await generateTicketPDF(uniqueRef, email, quantity);
+        const pdfBuffer = await generateTicketPDF(uniqueRef, email, quantity, firstName, lastName);
         const base64Pdf = pdfBuffer.toString('base64');
 
         // C. Send via Brevo API
@@ -121,7 +122,7 @@ app.post('/send-ticket', async (req, res) => {
             htmlContent: `
                 <div style="font-family: sans-serif;">
                     <h2>Payment Successful!</h2>
-                    <p>Thank you for booking your seat. Your reference number is <b>${uniqueRef}</b>.</p>
+                    <p>Hi ${firstName}, thank you for booking your seat. Your reference number is <b>${uniqueRef}</b>.</p>
                     <p>Please find your official entry tickets attached to this email.</p>
                     <br>
                     <p>We look forward to seeing you at <b>The Synagogues JWC</b> on the 14th of March.</p>
@@ -144,57 +145,56 @@ app.post('/send-ticket', async (req, res) => {
     }
 });
 
-// --- 4. PDF GENERATOR (STUB DESIGN) ---
-function generateTicketPDF(ref, email, qty) {
+// --- UPDATED PDF GENERATOR (FIXED BARCODE OVERLAP) ---
+function generateTicketPDF(ref, email, qty, firstName, lastName) {
     return new Promise((resolve) => {
         const doc = new PDFDocument({ size: [800, 250], margin: 0 });
         let buffers = [];
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-        // Background
         doc.rect(0, 0, 800, 250).fill('#F2EFE9'); 
 
-        // Polaroid Image (expects image in public/media/)
         try {
             doc.image('public/media/1994.png', 25, 25, { width: 175 });
         } catch (e) {
             doc.rect(25, 25, 175, 200).stroke('#ccc');
         }
 
-        // Header
-        doc.fillColor('#000').font('Helvetica').fontSize(11).text('EVENT TICKET', 230, 40);
-        doc.fillColor('#A83236').font('Times-BoldItalic').fontSize(48).text('MARITAL', 230, 60);
-        doc.text('GRACE', 230, 105);
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(10).text(EVENT_DETAILS.tagline, 230, 160);
+        doc.fillColor('#000').font('Helvetica').fontSize(11).text('EVENT TICKET', 230, 35);
+        doc.fillColor('#A83236').font('Times-BoldItalic').fontSize(48).text('MARITAL', 230, 55);
+        doc.text('GRACE', 230, 100);
+        
+        // Added Attendee Name to PDF
+        doc.fillColor('#000').font('Helvetica-Bold').fontSize(14).text(`${firstName.toUpperCase()} ${lastName.toUpperCase()}`, 230, 150);
+        doc.fontSize(9).font('Helvetica').text('THE KEY TO 32 YEARS OF MARRIAGE', 230, 170);
 
-        // Information Grid
-        doc.lineWidth(1);
-        doc.rect(220, 180, 360, 50).stroke('#000');
-        doc.moveTo(220, 205).lineTo(580, 205).stroke('#000'); // Horizontal line
-        doc.moveTo(480, 180).lineTo(480, 230).stroke('#000'); // Vertical line
+        // Table
+        doc.rect(220, 185, 360, 45).stroke('#000');
+        doc.moveTo(220, 207).lineTo(580, 207).stroke('#000');
+        doc.moveTo(480, 185).lineTo(480, 230).stroke('#000');
 
-        doc.fontSize(10).font('Helvetica').fillColor('#000');
-        doc.text(EVENT_DETAILS.venue, 230, 188);
-        doc.text(EVENT_DETAILS.date, 490, 188);
-        doc.text(EVENT_DETAILS.location, 230, 213);
-        doc.text(EVENT_DETAILS.time, 490, 213);
+        doc.fontSize(9).font('Helvetica');
+        doc.text("The Synagogues JWC", 230, 193);
+        doc.text("14.03.2026", 490, 193);
+        doc.text("63 Langrand Road, Vereeniging", 230, 215);
+        doc.text("9:00am", 490, 215);
 
-        // Perforation Dotted Line
-        for(let i = 10; i < 250; i+=15) {
-            doc.circle(610, i, 3).fill('#000');
-        }
+        // Perforation
+        for(let i = 10; i < 250; i+=15) { doc.circle(610, i, 3).fill('#000'); }
 
-        // Vertical Stub Text
+        // Vertical Stub Text - MOVED LEFT to avoid barcode
         doc.save();
         doc.rotate(-90, { origin: [750, 125] });
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(12).text(`TICKET NO: ${ref}  |  ADMIT: ${qty} PERSON(S)`, 630, 125);
+        // Shifted x-coordinate (which is vertical height after rotation)
+        doc.fillColor('#000').font('Helvetica-Bold').fontSize(11).text(`TICKET NO: ${ref}  |  ADMIT: ${qty}`, 630, 110);
         doc.restore();
 
-        // Simulated Barcode
-        for(let i = 0; i < 45; i++) {
-            let barWidth = Math.random() * 2.5 + 0.5;
-            doc.rect(660 + (i*2.8), 40, barWidth, 140).fill('#000');
+        // Barcode - SHIFTED RIGHT and made narrower
+        for(let i = 0; i < 40; i++) {
+            let barWidth = Math.random() * 2 + 0.5;
+            // Started at 690 instead of 660
+            doc.rect(690 + (i * 2.5), 40, barWidth, 140).fill('#000');
         }
 
         doc.end();
