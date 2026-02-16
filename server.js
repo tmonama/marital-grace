@@ -44,7 +44,7 @@ const EVENT_DETAILS = {
     time: "9:00am",
     location: "Langrand Road, Vereeniging, 1929",
     venue: "The Synagogues JWC",
-    pricePerTicket: 100
+    pricePerTicket: 250
 };
 
 // --- 3. ROUTES ---
